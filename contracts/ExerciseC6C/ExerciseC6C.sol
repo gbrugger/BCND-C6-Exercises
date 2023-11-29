@@ -6,7 +6,6 @@ pragma solidity ^0.4.25;
 
 import "../../node_modules/openzeppelin-solidity/contracts/math/SafeMath.sol";
 
-
 contract ExerciseC6C {
     using SafeMath for uint256; // Allow SafeMath functions to be called for all uint256 types (similar to "prototype" in Javascript)
 
@@ -23,8 +22,9 @@ contract ExerciseC6C {
         address wallet;
     }
 
-    address private contractOwner;              // Account used to deploy contract
-    mapping(string => Profile) employees;      // Mapping for storing employees
+    address private contractOwner; // Account used to deploy contract
+    mapping(string => Profile) employees; // Mapping for storing employees
+    mapping(address => bool) private authorizedContracts;
 
     /********************************************************************************************/
     /*                                       EVENT DEFINITIONS                                  */
@@ -33,14 +33,10 @@ contract ExerciseC6C {
     // No events
 
     /**
-    * @dev Constructor
-    *      The deploying account becomes contractOwner
-    */
-    constructor
-                                (
-                                ) 
-                                public 
-    {
+     * @dev Constructor
+     *      The deploying account becomes contractOwner
+     */
+    constructor() public {
         contractOwner = msg.sender;
     }
 
@@ -52,10 +48,9 @@ contract ExerciseC6C {
     // before a function is allowed to be executed.
 
     /**
-    * @dev Modifier that requires the "ContractOwner" account to be the function caller
-    */
-    modifier requireContractOwner()
-    {
+     * @dev Modifier that requires the "ContractOwner" account to be the function caller
+     */
+    modifier requireContractOwner() {
         require(msg.sender == contractOwner, "Caller is not contract owner");
         _;
     }
@@ -64,19 +59,12 @@ contract ExerciseC6C {
     /*                                       UTILITY FUNCTIONS                                  */
     /********************************************************************************************/
 
-   /**
-    * @dev Check if an employee is registered
-    *
-    * @return A bool that indicates if the employee is registered
-    */   
-    function isEmployeeRegistered
-                            (
-                                string id
-                            )
-                            external
-                            view
-                            returns(bool)
-    {
+    /**
+     * @dev Check if an employee is registered
+     *
+     * @return A bool that indicates if the employee is registered
+     */
+    function isEmployeeRegistered(string id) external view returns (bool) {
         return employees[id].isRegistered;
     }
 
@@ -84,90 +72,67 @@ contract ExerciseC6C {
     /*                                     SMART CONTRACT FUNCTIONS                             */
     /********************************************************************************************/
 
-    function registerEmployee
-                                (
-                                    string id,
-                                    bool isAdmin,
-                                    address wallet
-                                )
-                                external
-                                requireContractOwner
-    {
+    function registerEmployee(
+        string id,
+        bool isAdmin,
+        address wallet
+    ) external requireContractOwner {
         require(!employees[id].isRegistered, "Employee is already registered.");
 
         employees[id] = Profile({
-                                        id: id,
-                                        isRegistered: true,
-                                        isAdmin: isAdmin,
-                                        sales: 0,
-                                        bonus: 0,
-                                        wallet: wallet
-                                });
+            id: id,
+            isRegistered: true,
+            isAdmin: isAdmin,
+            sales: 0,
+            bonus: 0,
+            wallet: wallet
+        });
     }
 
-    function getEmployeeBonus
-                            (
-                                string id
-                            )
-                            external
-                            view
-                            requireContractOwner
-                            returns(uint256)
-    {
+    function getEmployeeBonus(
+        string id
+    ) external view requireContractOwner returns (uint256) {
         return employees[id].bonus;
     }
 
-    function updateEmployee
-                                (
-                                    string id,
-                                    uint256 sales,
-                                    uint256 bonus
-
-                                )
-                                internal
-                                requireContractOwner
-    {
+    function updateEmployee(string id, uint256 sales, uint256 bonus) public {
         require(employees[id].isRegistered, "Employee is not registered.");
 
         employees[id].sales = employees[id].sales.add(sales);
         employees[id].bonus = employees[id].bonus.add(bonus);
-
     }
 
-    function calculateBonus
-                            (
-                                uint256 sales
-                            )
-                            internal
-                            view
-                            requireContractOwner
-                            returns(uint256)
-    {
+    function calculateBonus(
+        uint256 sales
+    ) internal view requireContractOwner returns (uint256) {
         if (sales < 100) {
             return sales.mul(5).div(100);
-        }
-        else if (sales < 500) {
+        } else if (sales < 500) {
             return sales.mul(7).div(100);
-        }
-        else {
+        } else {
             return sales.mul(10).div(100);
         }
     }
 
-    function addSale
-                                (
-                                    string id,
-                                    uint256 amount
-                                )
-                                external
-                                requireContractOwner
-    {
-        updateEmployee(
-                        id,
-                        amount,
-                        calculateBonus(amount)
-        );
+    function addSale(string id, uint256 amount) external requireContractOwner {
+        updateEmployee(id, amount, calculateBonus(amount));
     }
 
+    function authorizeContract(
+        address appContract
+    ) external requireContractOwner {
+        require(appContract != address(0x0), "Invalid address.");
+        authorizedContracts[appContract] = true;
+    }
 
+    function deauthorizeContract(
+        address appContract
+    ) external requireContractOwner {
+        delete authorizedContracts[appContract];
+    }
+
+    modifier isCallerAuthorized() {
+        require(authorizedContracts[msg.sender], "Unauthorized.");
+        _;
+    }
 }
